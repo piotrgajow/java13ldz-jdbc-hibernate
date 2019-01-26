@@ -1,27 +1,50 @@
 package sda;
 
-import com.mysql.cj.jdbc.JdbcConnection;
-
-import java.sql.Connection;
-import java.sql.DriverManager;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Statement;
-import java.util.ArrayList;
+import javax.persistence.EntityManager;
+import javax.persistence.EntityManagerFactory;
+import javax.persistence.Persistence;
 import java.util.List;
 import java.util.Scanner;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 public class Main {
 
     public static void main(String[] args) {
-        try(Connection connection = prepareConnection()) {
-            Place newPlace = askUserForPlace();
-            addPlace(connection, newPlace);
-            List<Place> places = getPlaces(connection);
-            places.forEach(System.out::println);
-        } catch (SQLException e) {
-            e.printStackTrace();
+        Logger.getLogger("org.hibernate").setLevel(Level.SEVERE);
+        EntityManagerFactory factory = Persistence.createEntityManagerFactory("sda_hibernate");
+
+        EntityManager entityManager = factory.createEntityManager();
+        Place place = askUserForPlace();
+
+        entityManager.getTransaction().begin();
+        entityManager.persist(place);
+
+        List<Place> places = entityManager.createQuery("FROM Place", Place.class).getResultList();
+        places.forEach(System.out::println);
+
+        askUserForDelete(entityManager);
+
+        entityManager.getTransaction().commit();
+
+        places = entityManager.createQuery("FROM Place", Place.class).getResultList();
+        places.forEach(System.out::println);
+
+        entityManager.close();
+        factory.close();
+    }
+
+    private static void askUserForDelete(EntityManager entityManager) {
+        Scanner scanner = new Scanner(System.in);
+        System.out.println("Czy chcesz usunąć jakiś wiersz? (tak):  ");
+        if ("tak".equals(scanner.nextLine().toLowerCase())) {
+            System.out.println("Który wiersz chcesz usunąć? ");
+            Integer id = scanner.nextInt();
+
+            Place place = entityManager.find(Place.class, id);
+            entityManager.remove(place);
+        } else {
+            System.exit(0);
         }
     }
 
@@ -41,52 +64,6 @@ public class Main {
         place.parking = "tak".equals(scanner.nextLine().toLowerCase());
 
         return place;
-    }
-
-    private static void addPlace(Connection connection, Place place) throws SQLException {
-        String sqlQuery = "INSERT INTO place (city, address, name, cloak_room, parking) VALUES (?, ?, ?, ?, ?);";
-
-        PreparedStatement statement = connection.prepareStatement(sqlQuery);
-        statement.setString(1, place.city);
-        statement.setString(2, place.address);
-        statement.setString(3, place.name);
-        statement.setBoolean(4, place.cloakRoom);
-        statement.setBoolean(5, place.parking);
-        statement.executeUpdate();
-
-        statement.close();
-    }
-
-    private static List<Place> getPlaces(Connection connection) throws SQLException {
-        String sqlQuery = "SELECT * FROM place;";
-        Statement statement = connection.createStatement();
-        ResultSet resultSet = statement.executeQuery(sqlQuery);
-
-        List<Place> places = new ArrayList<>();
-        while (resultSet.next()) {
-            Place place = new Place();
-
-            place.id = resultSet.getInt("id");
-            place.city = resultSet.getString("city");
-            place.address = resultSet.getString("address");
-            place.name = resultSet.getString("name");
-            place.cloakRoom = resultSet.getBoolean("cloak_room");
-            place.parking = resultSet.getBoolean("parking");
-
-            places.add(place);
-        }
-
-        resultSet.close();
-        statement.close();
-
-        return places;
-    }
-
-    private static Connection prepareConnection() throws SQLException {
-        String user = "root";
-        String password = "";
-        String url = "jdbc:mysql://localhost:3306/sda_hibernate?serverTimezone=Europe/Warsaw";
-        return DriverManager.getConnection(url, user, password);
     }
 
 }

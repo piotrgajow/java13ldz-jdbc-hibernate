@@ -4,21 +4,57 @@ import com.mysql.cj.jdbc.JdbcConnection;
 
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Scanner;
 
 public class Main {
 
     public static void main(String[] args) {
         try(Connection connection = prepareConnection()) {
+            Place newPlace = askUserForPlace();
+            addPlace(connection, newPlace);
             List<Place> places = getPlaces(connection);
             places.forEach(System.out::println);
         } catch (SQLException e) {
             e.printStackTrace();
         }
+    }
+
+    private static Place askUserForPlace() {
+        Place place = new Place();
+
+        Scanner scanner = new Scanner(System.in);
+        System.out.print("Podaj miasto: ");
+        place.city = scanner.nextLine();
+        System.out.print("Podaj adres: ");
+        place.address = scanner.nextLine();
+        System.out.print("Podaj nazwę: ");
+        place.name = scanner.nextLine();
+        System.out.print("Czy na miejscu jest szatnia (tak): ");
+        place.cloakRoom = "tak".equals(scanner.nextLine().toLowerCase());
+        System.out.print("Czy na miejscu jest parking (tak): ");
+        place.parking = "tak".equals(scanner.nextLine().toLowerCase());
+
+        return place;
+    }
+
+    private static void addPlace(Connection connection, Place place) throws SQLException {
+        String sqlQuery = "INSERT INTO place (city, address, name, cloak_room, parking) VALUES (?, ?, ?, ?, ?);";
+
+        PreparedStatement statement = connection.prepareStatement(sqlQuery);
+        statement.setString(1, place.city);
+        statement.setString(2, place.address);
+        statement.setString(3, place.name);
+        statement.setBoolean(4, place.cloakRoom);
+        statement.setBoolean(5, place.parking);
+        statement.executeUpdate();
+
+        statement.close();
     }
 
     private static List<Place> getPlaces(Connection connection) throws SQLException {
